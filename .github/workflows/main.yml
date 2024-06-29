@@ -3,7 +3,74 @@ name: Deploy Strapi to EC2
 on:
   push:
     branches:
+      - mainname: Deploy Strapi to EC2
+
+on:
+  push:
+    branches:
       - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.5.3
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: SSH and deploy
+      env:
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USER: ${{ secrets.EC2_USER }}
+        EC2_PATH: ${{ secrets.EC2_PATH }}
+      run: |
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
+          # Update package repositories
+          sudo apt-get update
+          
+          # Install Node.js and npm
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+
+          # Install PM2 globally
+          sudo npm install -g pm2
+
+          # Define project directory
+          PROJECT_DIR="/home/ubuntu/my-strapi-app"
+
+          # Navigate to the project directory or clone if it does not exist
+          if [ ! -d "$PROJECT_DIR" ]; then
+             git clone https://github.com/your-username/your-strapi-app.git $PROJECT_DIR
+          fi
+          cd $PROJECT_DIR
+
+          # Pull the latest changes from the repository
+          git pull origin main
+
+          # Install dependencies
+          npm install --production
+
+          # Build the project (if applicable)
+          npm run build || true  # Adjust as per your Strapi project setup
+
+          # Restart Strapi using PM2
+          pm2 restart strapi || pm2 start npm --name "strapi" -- run start
+          
+          # Optional: Check if the service is running on port 1337
+          sleep 10
+          if lsof -i:1337 > /dev/null 2>&1; then
+              echo "Strapi service is running on port 1337."
+          else
+              echo "Strapi service is not running on port 1337."
+              exit 1
+          fi
+        EOF
+
 
 jobs:
   deploy:
