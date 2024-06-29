@@ -33,7 +33,7 @@ jobs:
         echo "Starting deployment..."
         
         # Use SSH agent to handle the private key
-        ssh -o StrictHostKeyChecking=no -i privatekey.pem $EC2_USER@$EC2_HOST '
+        ssh -o StrictHostKeyChecking=no -i /c/Users/HP/Downloads/privatekey.pem $EC2_USER@$EC2_HOST '
           echo "Connected."
           cd $EC2_PATH
           
@@ -48,4 +48,3 @@ jobs:
 
           echo "Deployment complete."
         '
-
