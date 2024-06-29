@@ -18,10 +18,10 @@ jobs:
       with:
         node-version: '18'
 
-    - name: Install dependencies
+    - name: Install dependencies and build
       run: |
         npm install --production
-        npm run build  # Ensure your Strapi project requires a build step
+        npm run build
 
     - name: Deploy to EC2
       env:
@@ -32,8 +32,8 @@ jobs:
       run: |
         echo "Starting deployment..."
         
-        # Use a single SSH connection for all operations to minimize overhead
-        ssh -o StrictHostKeyChecking=no -i <(echo "$SSH_PRIVATE_KEY") $EC2_USER@$EC2_HOST '
+        # Use SSH agent to handle the private key
+        ssh -o StrictHostKeyChecking=no -i privatekey.pem $EC2_USER@$EC2_HOST '
           echo "Connected."
           cd $EC2_PATH
           
