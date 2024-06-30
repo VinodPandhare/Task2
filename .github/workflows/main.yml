@@ -1,50 +1,28 @@
-name: CI/CD Pipeline
+- name: Deploy to EC2
+  env:
+    SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+    EC2_USER: ${{ secrets.EC2_USER }}
+    EC2_HOST: ${{ secrets.EC2_HOST }}
+    EC2_PATH: ${{ secrets.EC2_PATH }}
+  run: |
+    echo "Starting deployment..."
 
-on:
-  push:
-    branches:
-      - main
+    # Add SSH key to the agent
+    echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+    # Deploy to EC2
+    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "
+      echo 'Connected.'
+      cd $EC2_PATH
+      
+      echo 'Updating codebase...'
+      git pull origin main
+      
+      echo 'Installing dependencies...'
+      npm install --production
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      echo 'Restarting Strapi...'
+      pm2 restart strapi --update-env || pm2 start npm --name 'strapi' -- run start
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '18'
-
-    - name: Install dependencies and build
-      run: |
-        npm install --production
-        npm run build
-
-    - name: Deploy to EC2
-      env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        EC2_USER: ${{ secrets.EC2_USER }}
-        EC2_HOST: ${{ secrets.EC2_HOST }}
-        EC2_PATH: ${{ secrets.EC2_PATH }}
-      run: |
-        echo "Starting deployment..."
-        
-        # Use SSH agent to handle the private key
-        ssh -o StrictHostKeyChecking=no -i /c/Users/HP/Downloads/privatekey.pem $EC2_USER@$EC2_HOST '
-          echo "Connected."
-          cd $EC2_PATH
-          
-          echo "Updating codebase..."
-          git pull origin main
-          
-          echo "Installing dependencies..."
-          npm install --production
-
-          echo "Restarting Strapi..."
-          pm2 restart strapi --update-env || pm2 start npm --name "strapi" -- run start
-
-          echo "Deployment complete."
-        '
+      echo 'Deployment complete.'
+    "
