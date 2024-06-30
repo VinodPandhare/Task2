@@ -1,28 +1,54 @@
-- name: Deploy to EC2
-  env:
-    SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-    EC2_USER: ${{ secrets.EC2_USER }}
-    EC2_HOST: ${{ secrets.EC2_HOST }}
-    EC2_PATH: ${{ secrets.EC2_PATH }}
-  run: |
-    echo "Starting deployment..."
+name: CI/CD Pipeline
 
-    # Add SSH key to the agent
-    echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+on:
+  push:
+    branches:
+      - main
 
-    # Deploy to EC2
-    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "
-      echo 'Connected.'
-      cd $EC2_PATH
-      
-      echo 'Updating codebase...'
-      git pull origin main
-      
-      echo 'Installing dependencies...'
-      npm install --production
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
 
-      echo 'Restarting Strapi...'
-      pm2 restart strapi --update-env || pm2 start npm --name 'strapi' -- run start
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      echo 'Deployment complete.'
-    "
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '18'
+
+    - name: Install dependencies and build
+      run: |
+        npm install --production
+        npm run build
+
+    - name: Deploy to EC2
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        EC2_USER: ${{ secrets.EC2_USER }}
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_PATH: ${{ secrets.EC2_PATH }}
+      run: |
+        echo "Starting deployment..."
+
+        # Start the SSH agent and add the private key
+        eval $(ssh-agent -s)
+        echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+
+        # Deploy to EC2
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "
+          echo 'Connected.'
+          cd $EC2_PATH
+
+          echo 'Updating codebase...'
+          git pull origin main
+
+          echo 'Installing dependencies...'
+          npm install --production
+
+          echo 'Restarting Strapi...'
+          pm2 restart strapi --update-env || pm2 start npm --name 'strapi' -- run start
+
+          echo 'Deployment complete.'
+        "
